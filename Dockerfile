@@ -18,7 +18,6 @@ FROM alpine:latest
 RUN apk update && \
     apk upgrade && \
     apk add ca-certificates
-
 WORKDIR /root/
 
 # Copy files from previous build container
