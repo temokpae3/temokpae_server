@@ -69,8 +69,7 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Initialize a session
 	sess, err := session.NewSession(&aws.Config{
-		Region:   aws.String("us-east-1"),
-		Endpoint: aws.String("https://dynamodb.us-east-1.amazonaws.com")},
+		Region: aws.String("us-east-1")},
 	)
 	if err != nil {
 		client.EchoSend("error", "Got error initializing AWS: "+err.Error())
@@ -125,8 +124,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Initialize aws session
 	sess, err := session.NewSession(&aws.Config{
-		Region:   aws.String("us-east-1"),
-		Endpoint: aws.String("https://dynamodb.us-east-1.amazonaws.com")},
+		Region: aws.String("us-east-1")},
 	)
 	if err != nil {
 		client.EchoSend("error", "Got error initializing AWS: "+err.Error())
