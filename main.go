@@ -99,7 +99,8 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// DB scanning error response
 	if scanErr != nil {
-		panic(fmt.Sprintf("Got error scanning DB, %v", scanErr))
+		client.EchoSend("error", "Got error scanning DB: "+scanErr.Error())
+		os.Exit(1)
 	}
 
 	// Response of JSON
@@ -109,9 +110,10 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 // Server Handler function that displays the server time
 func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	client := loggly.New("LOGGLY_TOKEN")
+	client.EchoSend("info", "/server endpoint called")
 	w.WriteHeader(http.StatusOK)
 	sysTime := resTime{time.Now().String()}
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(sysTime)
 }
 
@@ -123,13 +125,12 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// Initialize aws session
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("us-east-1")},
-	)
-	if err != nil {
-		client.EchoSend("error", "Got error initializing AWS: "+err.Error())
-		os.Exit(1)
-	}
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{
+			Region: aws.String("us-east-1"),
+		},
+		SharedConfigState: session.SharedConfigEnable,
+	}))
 
 	// Create DynamoDB client
 	svc := dynamodb.New(sess)
