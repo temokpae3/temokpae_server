@@ -19,7 +19,7 @@ type resTime struct {
 }
 
 // Define a struct to store the logging response
-type loggingResponseWriter struct {
+type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
@@ -35,14 +35,15 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Implement the http.ResponseWriter interface
-func NewLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
-	return &loggingResponseWriter{w, http.StatusOK}
+func (rw *responseWriter) WriteHeader(status int) {
+	rw.statusCode = status
+	rw.ResponseWriter.WriteHeader(status)
 }
 
 // Loggly Middleware function
 func logglyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		lrw := NewLoggingResponseWriter(w)
+		lrw := &responseWriter{ResponseWriter: w}
 		next.ServeHTTP(lrw, r)
 
 		// Tag + client init for Loggly + send message
