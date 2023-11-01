@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -42,6 +43,11 @@ type APIData struct {
 	Thumb              string `json:"thumb"`
 }
 
+// Define a struct to store the server time
+type resTime struct {
+	SystemTime string
+}
+
 // Define a struct to store the table status
 type TableStatus struct {
 	Table string `json:"table"`
@@ -52,6 +58,16 @@ type TableStatus struct {
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
+}
+
+// Server Handler function that displays the server time
+func ServerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	client := loggly.New("LOGGLY_TOKEN")
+	client.EchoSend("info", "/server endpoint called")
+	w.WriteHeader(http.StatusOK)
+	sysTime := resTime{time.Now().String()}
+	json.NewEncoder(w).Encode(sysTime)
 }
 
 // All Handler function that displays all the items in DynamoDB
@@ -159,6 +175,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/temokpae/all", AllHandler).Methods("GET")
 	router.HandleFunc("/temokpae/status", StatusHandler).Methods("GET")
+	router.HandleFunc("/temokpae/server", ServerHandler).Methods("GET")
 	log.Println("Server running...")
 	wrappedRouter := logglyMiddleware(router)
 	log.Fatal(http.ListenAndServe(":8080", wrappedRouter))
