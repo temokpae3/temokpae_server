@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -41,11 +40,6 @@ type APIData struct {
 	LastChange         int    `json:"lastChange"`
 	DealRating         string `json:"dealRating"`
 	Thumb              string `json:"thumb"`
-}
-
-// Define a struct to store the server time
-type resTime struct {
-	SystemTime string
 }
 
 // Define a struct to store the table status
@@ -104,16 +98,6 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Response of JSON
 	json.NewEncoder(w).Encode(allResponse)
-}
-
-// Server Handler function that displays the server time
-func ServerHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	client := loggly.New("LOGGLY_TOKEN")
-	client.EchoSend("info", "/server endpoint called")
-	w.WriteHeader(http.StatusOK)
-	sysTime := resTime{time.Now().String()}
-	json.NewEncoder(w).Encode(sysTime)
 }
 
 // Status Handler function that displays the table status
@@ -175,7 +159,6 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/temokpae/all", AllHandler).Methods("GET")
 	router.HandleFunc("/temokpae/status", StatusHandler).Methods("GET")
-	router.HandleFunc("/temokpae/server", ServerHandler).Methods("GET")
 	log.Println("Server running...")
 	wrappedRouter := logglyMiddleware(router)
 	log.Fatal(http.ListenAndServe(":8080", wrappedRouter))
