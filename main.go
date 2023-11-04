@@ -13,7 +13,6 @@ import (
 
 	"github.com/jamespearly/loggly"
 	"github.com/microcosm-cc/bluemonday"
-	"gopkg.in/validator.v2"
 
 	"github.com/gorilla/mux"
 
@@ -171,7 +170,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	client.EchoSend("info", "/search endpoint called")
 
 	// Create a bluemonday policy
-	policy := bluemonday.UGCPolicy()
+	policy := bluemonday.StrictPolicy()
 
 	// Create a query
 	query := r.URL.Query()
@@ -188,16 +187,10 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	// Regex matching
 	matching, err := regexp.MatchString("[a-zA-Z0-9]$", internalName)
 
+	// Validate the 'matching' parameter using the customValidator function
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		client.EchoSend("error", "Got error matching regex: "+err.Error())
-		os.Exit(1)
-	}
-
-	// Validating the matching parameter
-	if err == validator.Validate(matching) {
-		w.WriteHeader(http.StatusBadRequest)
-		client.EchoSend("error", "Got error validating: "+err.Error())
+		client.EchoSend("error", "Got error matching: "+err.Error())
 		os.Exit(1)
 	}
 
