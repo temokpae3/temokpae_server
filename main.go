@@ -187,11 +187,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	// Regex matching
 	matching, err := regexp.MatchString("[a-zA-Z0-9]$", internalName)
 
-	// Validate the 'matching' parameter using the customValidator function
+	// Regex error response
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		client.EchoSend("error", "Got error matching: "+err.Error())
-		os.Exit(1)
+		return
 	}
 
 	if matching {
