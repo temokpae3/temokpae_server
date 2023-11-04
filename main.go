@@ -7,10 +7,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/jamespearly/loggly"
+	"github.com/microcosm-cc/bluemonday"
+	"gopkg.in/validator.v2"
 
 	"github.com/gorilla/mux"
 
@@ -18,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
 // Define a struct to store the server time
@@ -92,7 +96,7 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 	// Table name
 	tableName := "test-table-temokpae"
 
-	// Scan the DB for all the items
+	// Scans the DB for all the items
 	scan := svc.ScanPages(&dynamodb.ScanInput{
 		TableName: aws.String(tableName),
 	}, func(page *dynamodb.ScanOutput, last bool) bool {
@@ -114,7 +118,7 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 		os.Exit(1)
 	}
 
-	// Response of JSON
+	// Convert to JSON
 	json.NewEncoder(w).Encode(allResponse)
 }
 
@@ -133,7 +137,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	// Create DynamoDB client
+	// Create the DynamoDB client
 	svc := dynamodb.New(sess)
 
 	// Table name
@@ -144,6 +148,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		TableName: aws.String(tableName),
 	}
 
+	// Describe table inputed
 	result, err := svc.DescribeTable(input)
 	if err != nil {
 		client.EchoSend("error", "Got error describing table: "+err.Error())
@@ -155,14 +160,121 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	statusResponse.Table = "test-table-temokpae"
 	statusResponse.Count = result.Table.ItemCount
 
-	// JSON Response
+	// Convert to JSON
 	json.NewEncoder(w).Encode(statusResponse)
+}
+
+// Search Handler function that searches the table
+func SearchHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	client := loggly.New("LOGGLY_TOKEN")
+	client.EchoSend("info", "/search endpoint called")
+
+	// Create a bluemonday policy
+	policy := bluemonday.UGCPolicy()
+
+	// Create a query
+	query := r.URL.Query()
+
+	// Sanitizes the query parameter
+	internalName := policy.Sanitize(query.Get("internalName"))
+
+	// If the query parameter is anything other than internalName, return 400.
+	if internalName == "" || len(query) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Regex matching
+	matching, err := regexp.MatchString("[a-zA-Z0-9]$", internalName)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		client.EchoSend("error", "Got error matching regex: "+err.Error())
+		os.Exit(1)
+	}
+
+	// Validating the matching parameter
+	if err == validator.Validate(matching) {
+		w.WriteHeader(http.StatusBadRequest)
+		client.EchoSend("error", "Got error validating: "+err.Error())
+		os.Exit(1)
+	}
+
+	if matching {
+		w.WriteHeader(http.StatusOK)
+
+		// Initialize aws session
+		sess := session.Must(session.NewSessionWithOptions(session.Options{
+			Config: aws.Config{
+				Region: aws.String("us-east-1"),
+			},
+			SharedConfigState: session.SharedConfigEnable,
+		}))
+
+		// Create DynamoDB client
+		svc := dynamodb.New(sess)
+
+		// Table name
+		tableName := "test-table-temokpae"
+
+		// Create the expression
+		filt := expression.Contains(expression.Name("internalName"), internalName)
+
+		expr, err := expression.NewBuilder().WithFilter(filt).Build()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			client.EchoSend("error", "Got error building expression: "+err.Error())
+			os.Exit(1)
+		}
+
+		// Build the query input parameters
+		params := &dynamodb.ScanInput{
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+			FilterExpression:          expr.Filter(),
+			ProjectionExpression:      expr.Projection(),
+			TableName:                 aws.String(tableName),
+		}
+
+		// Get all the results of the given internalName
+		result, err := svc.Scan(params)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			client.EchoSend("error", "Got error calling Scan: "+err.Error())
+			os.Exit(1)
+		}
+
+		// Unmarshal the response
+		response := []APIData{}
+		err = dynamodbattribute.UnmarshalListOfMaps(result.Items, &response)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			client.EchoSend("error", "Got error unmarshalling: "+err.Error())
+			os.Exit(1)
+		}
+
+		// Convert to JSON
+		json.NewEncoder(w).Encode(response)
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		message := "Search format: /search?internalName=NAME"
+		json.NewEncoder(w).Encode(message)
+	}
 }
 
 // Implement the http.ResponseWriter interface
 func (rw *responseWriter) WriteHeader(status int) {
 	rw.statusCode = status
 	rw.ResponseWriter.WriteHeader(status)
+}
+
+// Implements the http response to bad requests ("POST", "PUT", "DELETE", "PATCH")
+func BadRequest(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusMethodNotAllowed)
+	client := loggly.New("LOGGLY_TOKEN")
+	client.EchoSend("error", "Method: "+r.Method+". Not allowed from: "+r.RemoteAddr+"Path: "+r.RequestURI)
 }
 
 // Loggly Middleware function
@@ -182,6 +294,8 @@ func main() {
 	router.HandleFunc("/temokpae/server", ServerHandler).Methods("GET")
 	router.HandleFunc("/temokpae/all", AllHandler).Methods("GET")
 	router.HandleFunc("/temokpae/status", StatusHandler).Methods("GET")
+	router.HandleFunc("/temokpae/search", SearchHandler).Queries("internalName", "{internalName:.*}").Methods("GET")
+	router.Methods("POST", "PUT", "PATCH", "DELETE").HandlerFunc(BadRequest)
 	log.Println("Server running...")
 	wrappedRouter := logglyMiddleware(router)
 	log.Fatal(http.ListenAndServe(":8080", wrappedRouter))
