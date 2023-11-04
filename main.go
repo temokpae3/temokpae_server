@@ -181,6 +181,9 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	// If the query parameter is anything other than internalName, return 400.
 	if internalName == "" || len(query) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
+		message := "Query parameter is empty. Please provide a query parameter."
+		json.NewEncoder(w).Encode(message)
+		client.EchoSend("error", "Got error: "+message)
 		return
 	}
 
@@ -252,7 +255,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		message := "Search format: /search?internalName=NAME"
+		message := "The search format is incorrect or the query parameter is invalid. The query parameter should only contain letters and/or numbers. Correct format: /search?internalName=NAME."
 		json.NewEncoder(w).Encode(message)
 	}
 }
