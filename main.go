@@ -73,7 +73,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sysTime)
 }
 
-// All Handler function that displays all the items
+// All Handler function that displays all the items in the DynamoDB table
 func AllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	client := loggly.New("LOGGLY_TOKEN")
@@ -91,6 +91,7 @@ func AllHandler(w http.ResponseWriter, r *http.Request) {
 	// Create DynamoDB client
 	svc := dynamodb.New(sess)
 
+	// Define a struct to store the All Handler response
 	var allResponse []APIData
 
 	// Table name
@@ -170,7 +171,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	client := loggly.New("LOGGLY_TOKEN")
 	client.EchoSend("info", "/search endpoint called")
 
-	// Create a bluemonday policy
+	// Create a bluemonday policy to sanitize the query parameter
 	policy := bluemonday.StrictPolicy()
 
 	// Create a query
