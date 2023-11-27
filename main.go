@@ -73,6 +73,7 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sysTime)
 }
 
+// All Handler function that displays all the items
 func AllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	client := loggly.New("LOGGLY_TOKEN")
